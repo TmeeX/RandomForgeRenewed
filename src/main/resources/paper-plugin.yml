@@ -1,0 +1,4 @@
+name: RandomForgeRenewed
+version: '0.1-Alpha'
+main: org.Tmeex.randomForgeRenewed.RandomForgeRenewed
+api-version: '1.21'
