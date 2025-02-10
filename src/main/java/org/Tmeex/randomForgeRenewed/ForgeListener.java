@@ -1,8 +1,11 @@
 package org.Tmeex.randomForgeRenewed;
 
+import com.google.common.collect.ArrayListMultimap;
+import com.google.common.collect.ImmutableMultimap;
+import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Multimap;
 import org.bukkit.Material;
 import org.bukkit.attribute.Attribute;
-import org.bukkit.attribute.AttributeInstance;
 import org.bukkit.attribute.AttributeModifier;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -10,6 +13,7 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.Damageable;
 import org.bukkit.inventory.meta.ItemMeta;
 import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
@@ -57,26 +61,41 @@ public class ForgeListener implements Listener {
 
     private void addAttackDamage(ItemStack item, ConfigManager.ForgingMaterial material) {
         ItemMeta meta = item.getItemMeta();
-        double attackValue = ThreadLocalRandom.current()
-                .nextDouble(material.getMinAttack(), material.getMaxAttack());
-        // 待改,attackAttribute已经弃用
-        AttributeInstance attackAttribute = (AttributeInstance) meta.getAttributeModifiers(Attribute.GENERIC_ATTACK_DAMAGE);
+        if (meta == null) return;
 
-        meta.addAttributeModifier(Attribute.GENERIC_ATTACK_DAMAGE,
-                new AttributeModifier(
-                        UUID.randomUUID(),
-                        "forge_attack",
-                        attackValue,
-                        AttributeModifier.Operation.ADD_NUMBER,
-                        EquipmentSlot.HAND
-                ));
+        // 获取现有属性（可能为null）
+        Multimap<Attribute, AttributeModifier> attributes = meta.getAttributeModifiers();
+
+        // 创建新的属性映射（使用Guava的ArrayListMultimap）
+        Multimap<Attribute, AttributeModifier> newAttributes = attributes != null ?
+                ArrayListMultimap.create(attributes) :
+                ArrayListMultimap.create();
+
+        // 创建新修饰符
+        AttributeModifier modifier = new AttributeModifier(
+                UUID.randomUUID(),
+                "forge_attack",
+                ThreadLocalRandom.current().nextDouble(material.getMinAttack(), material.getMaxAttack()),
+                AttributeModifier.Operation.ADD_NUMBER,
+                EquipmentSlot.HAND
+        );
+
+        // 添加新属性
+        newAttributes.put(Attribute.GENERIC_ATTACK_DAMAGE, modifier);
+
+        // 设置回ItemMeta
+        meta.setAttributeModifiers(newAttributes);
         item.setItemMeta(meta);
     }
 
     private void handleFailure(ItemStack item) {
         if (plugin.getConfigManager().shouldPreventBreak()) {
-            int damage = item.getDurability() + plugin.getConfigManager().getDurabilityLoss();
-            item.setDurability((short) Math.min(damage, item.getType().getMaxDurability()));
+            ItemMeta meta = item.getItemMeta();
+            if (meta instanceof Damageable damageable) {
+                int newDamage = damageable.getDamage() + plugin.getConfigManager().getDurabilityLoss();
+                damageable.setDamage(Math.min(newDamage, item.getType().getMaxDurability()));
+                item.setItemMeta(damageable);
+            }
         } else {
             item.setAmount(0);
         }
