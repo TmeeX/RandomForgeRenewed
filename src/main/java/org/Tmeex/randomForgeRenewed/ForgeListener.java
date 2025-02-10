@@ -1,14 +1,17 @@
 package org.Tmeex.randomForgeRenewed;
 
+import org.bukkit.Material;
+import org.bukkit.attribute.Attribute;
+import org.bukkit.attribute.AttributeInstance;
 import org.bukkit.attribute.AttributeModifier;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
-
-import java.util.Random;
+import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
 
 public class ForgeListener implements Listener {
@@ -20,76 +23,80 @@ public class ForgeListener implements Listener {
 
     @EventHandler
     public void onAnvilUse(PlayerInteractEvent event) {
-        // 检查是否右键点击铁砧
+        if (event.getHand() != EquipmentSlot.HAND) return;
         if (event.getClickedBlock() == null ||
                 !event.getClickedBlock().getType().name().contains("ANVIL")) return;
 
-        ItemStack item = event.getItem();
-        if (item == null) return;
-
-        // 检查是否武器
+        Player player = event.getPlayer();
+        ItemStack item = player.getInventory().getItemInMainHand();
         if (!isWeapon(item)) return;
 
-        // 检查材料匹配
-        if (!checkMaterials(event.getPlayer(), item)) return;
+        Optional<ConfigManager.ForgingMaterial> material = plugin.getConfigManager().getMaterials().stream()
+                .filter(m -> hasEnoughMaterials(player, m))
+                .findFirst();
 
-        // 执行强化逻辑
-        processForging(event.getPlayer(), item);
-    }
+        if (!material.isPresent()) return;
 
-    private boolean isWeapon(ItemStack item) {
-        // 这里需要根据武器判断逻辑实现
-        return item.getType().name().endsWith("_SWORD") ||
-                item.getType().name().endsWith("_AXE");
-    }
-
-    private boolean checkMaterials(Player player, ItemStack weapon) {
-        // 实现材料检查逻辑
-        return true;
-    }
-
-    private void processForging(Player player, ItemStack weapon) {
-        ConfigManager config = plugin.getConfigManager();
-        Random random = new Random();
-
-        // 检查强化成功率
-        if (random.nextDouble() < getSuccessChance()) {
-            // 强化成功，添加属性
-            addAttributes(weapon);
-            player.sendMessage("§a强化成功！");
-        } else {
-            // 强化失败处理
-            handleFailure(weapon);
-            player.sendMessage("§c强化失败...");
+        if (tryForge(player, item, material.get())) {
+            consumeMaterials(player, material.get());
         }
     }
 
-    private void addAttributes(ItemStack item) {
-        // 使用AttributePlus API添加属性
-        ItemMeta meta = item.getItemMeta();
-        // 示例：添加攻击伤害属性
-        AttributePlus.getInstance().getAttributeManager()
-                .addAttribute(meta, "GENERIC_ATTACK_DAMAGE",
-                        generateRandomValue("attack"),
-                        AttributeModifier.Operation.ADD_NUMBER);
-        item.setItemMeta(meta);
+    private boolean tryForge(Player player, ItemStack weapon, ConfigManager.ForgingMaterial material) {
+        Random random = ThreadLocalRandom.current();
+        if (random.nextDouble() > material.getChance()) {
+            handleFailure(weapon);
+            player.sendMessage("§c强化失败！");
+            return false;
+        }
+
+        addAttackDamage(weapon, material);
+        player.sendMessage("§a强化成功！攻击力增加了！");
+        return true;
     }
 
-    private double generateRandomValue(String attributeType) {
-        // 根据配置生成随机数值
-        return ThreadLocalRandom.current().nextDouble(3, 5);
+    private void addAttackDamage(ItemStack item, ConfigManager.ForgingMaterial material) {
+        ItemMeta meta = item.getItemMeta();
+        double attackValue = ThreadLocalRandom.current()
+                .nextDouble(material.getMinAttack(), material.getMaxAttack());
+        // 待改,attackAttribute已经弃用
+        AttributeInstance attackAttribute = (AttributeInstance) meta.getAttributeModifiers(Attribute.GENERIC_ATTACK_DAMAGE);
+
+        meta.addAttributeModifier(Attribute.GENERIC_ATTACK_DAMAGE,
+                new AttributeModifier(
+                        UUID.randomUUID(),
+                        "forge_attack",
+                        attackValue,
+                        AttributeModifier.Operation.ADD_NUMBER,
+                        EquipmentSlot.HAND
+                ));
+        item.setItemMeta(meta);
     }
 
     private void handleFailure(ItemStack item) {
         if (plugin.getConfigManager().shouldPreventBreak()) {
-            // 扣除耐久
-            Damageable damageable = (Damageable) item.getItemMeta();
-            damageable.setDamage(damageable.getDamage() +
-                    plugin.getConfigManager().getDurabilityLoss());
-            item.setItemMeta(damageable);
+            int damage = item.getDurability() + plugin.getConfigManager().getDurabilityLoss();
+            item.setDurability((short) Math.min(damage, item.getType().getMaxDurability()));
         } else {
-            // 直接销毁
             item.setAmount(0);
         }
+    }
+    // 这个类用于失败扣除物品耐久
+
+    private boolean isWeapon(ItemStack item) {
+        if (item == null) return false;
+        String type = item.getType().name();
+        return type.endsWith("_SWORD") || type.endsWith("_AXE");
+    }
+
+    private boolean hasEnoughMaterials(Player player, ConfigManager.ForgingMaterial material) {
+        return player.getInventory().contains(Material.matchMaterial(material.getType()), material.getAmount());
+    }
+
+    private void consumeMaterials(Player player, ConfigManager.ForgingMaterial material) {
+        player.getInventory().removeItem(new ItemStack(
+                Material.matchMaterial(material.getType()),
+                material.getAmount()
+        ));
     }
 }

@@ -1,31 +1,23 @@
-# RandomForgeRenewed 配置
-
-# 失败时是否防止武器损坏
+# 强化失败时是否保护武器不消失
 prevent-break: true
 
-# 失败时耐久扣除量（当prevent-break为true时生效）
-durability-loss-on-failure: 10
+# 失败时耐久损失量（当prevent-break为true时有效）
+durability-loss-on-failure: 15
 
-# 锻造材料配置
+# 强化材料配置
 materials:
-  - type: IRON_INGOT
+  iron:
+    type: IRON_INGOT
     amount: 3
-    chance: 0.7
-    attributes:
-      attack:
-        min: 3.0
-        max: 5.0
-      defense:
-        min: 2.0
-        max: 4.0
+    chance: 0.65
+    attack:
+      min: 2.0
+      max: 4.0
 
-  - type: DIAMOND
+  diamond:
+    type: DIAMOND
     amount: 1
-    chance: 0.3
-    attributes:
-      attack:
-        min: 5.0
-        max: 8.0
-      attack-speed:
-        min: 0.1
-        max: 0.3
+    chance: 0.35
+    attack:
+      min: 4.0
+      max: 6.0

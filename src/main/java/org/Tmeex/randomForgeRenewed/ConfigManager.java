@@ -1,42 +1,50 @@
 package org.Tmeex.randomForgeRenewed;
 
-import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.ConfigurationSection;
+import org.bukkit.configuration.file.FileConfiguration;
+import org.jetbrains.annotations.NotNull;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 public class ConfigManager {
     private final RandomForgeRenewed plugin;
-    private FileConfiguration config;
-
-    // 配置项存储
+    private final List<ForgingMaterial> materials = new ArrayList<>();
     private boolean preventBreak;
     private int durabilityLoss;
-    private List<Map<String, Object>> materials = new ArrayList<>();
 
     public ConfigManager(RandomForgeRenewed plugin) {
         this.plugin = plugin;
-        reloadConfig();
+        reload();
     }
 
-    public void reloadConfig() {
+    public void reload() {
         plugin.saveDefaultConfig();
         plugin.reloadConfig();
-        config = plugin.getConfig();
+        FileConfiguration config = plugin.getConfig();
 
-        // 加载配置
+        materials.clear();
         preventBreak = config.getBoolean("prevent-break", true);
         durabilityLoss = config.getInt("durability-loss-on-failure", 10);
 
-        materials.clear();
-        for (Object materialObj : config.getList("materials", new ArrayList<>())) {
-            if (materialObj instanceof Map) {
-                materials.add((Map<String, Object>) materialObj);
+        ConfigurationSection materialsSection = config.getConfigurationSection("materials");
+        if (materialsSection != null) {
+            for (String key : materialsSection.getKeys(false)) {
+                ConfigurationSection matSection = materialsSection.getConfigurationSection(key);
+                if (matSection != null) {
+                    materials.add(new ForgingMaterial(
+                            matSection.getString("type"),
+                            matSection.getInt("amount"),
+                            matSection.getDouble("chance"),
+                            matSection.getDouble("attack.min"),
+                            matSection.getDouble("attack.max")
+                    ));
+                }
             }
         }
+    }
+
+    public List<ForgingMaterial> getMaterials() {
+        return Collections.unmodifiableList(materials);
     }
 
     public boolean shouldPreventBreak() {
@@ -47,7 +55,41 @@ public class ConfigManager {
         return durabilityLoss;
     }
 
-    public List<Map<String, Object>> getMaterials() {
-        return new ArrayList<>(materials);
+    public static class ForgingMaterial {
+        private final String type;
+        private final int amount;
+        private final double chance;
+        private final double minAttack;
+        private final double maxAttack;
+
+        public ForgingMaterial(String type, int amount, double chance, double minAttack, double maxAttack) {
+            this.type = type;
+            this.amount = amount;
+            this.chance = chance;
+            this.minAttack = minAttack;
+            this.maxAttack = maxAttack;
+        }
+
+        public double getMaxAttack() {
+            return maxAttack;
+        }
+
+        public double getMinAttack() {
+            return minAttack;
+        }
+
+        public String getType() {
+            return type;
+        }
+
+        public int getAmount() {
+            return amount;
+        }
+
+        public double getChance() {
+            return chance;
+        }
+
+        // Getters...
     }
 }
