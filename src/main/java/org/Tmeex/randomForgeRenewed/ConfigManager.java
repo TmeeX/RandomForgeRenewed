@@ -2,8 +2,6 @@ package org.Tmeex.randomForgeRenewed;
 
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
-import org.jetbrains.annotations.NotNull;
-
 import java.util.*;
 
 public class ConfigManager {
@@ -34,9 +32,11 @@ public class ConfigManager {
                     materials.add(new ForgingMaterial(
                             matSection.getString("type"),
                             matSection.getInt("amount"),
-                            matSection.getDouble("chance"),
+                            matSection.getDouble("chance", 0.7),
                             matSection.getDouble("attack.min"),
-                            matSection.getDouble("attack.max")
+                            matSection.getDouble("attack.max"),
+                            matSection.getDouble("speed.min", 1.0), // 默认值
+                            matSection.getDouble("speed.max", 1.0)
                     ));
                 }
             }
@@ -61,13 +61,17 @@ public class ConfigManager {
         private final double chance;
         private final double minAttack;
         private final double maxAttack;
+        private final double minSpeed;
+        private final double maxSpeed;
 
-        public ForgingMaterial(String type, int amount, double chance, double minAttack, double maxAttack) {
+        public ForgingMaterial(String type, int amount, double chance, double minAttack, double maxAttack, double minSpeed, double maxSpeed) {
             this.type = type;
             this.amount = amount;
             this.chance = chance;
             this.minAttack = minAttack;
             this.maxAttack = maxAttack;
+            this.minSpeed = minSpeed;
+            this.maxSpeed = maxSpeed;
         }
 
         public double getMaxAttack() {
@@ -88,6 +92,14 @@ public class ConfigManager {
 
         public double getChance() {
             return chance;
+        }
+
+        public double getMinSpeed() {
+            return minSpeed;
+        }
+
+        public double getMaxSpeed() {
+            return maxSpeed;
         }
 
         // Getters...
