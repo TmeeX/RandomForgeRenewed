@@ -1,9 +1,0 @@
-name: RandomForgeRenewed
-version: '0.1-Alpha'
-main: org.Tmeex.randomForgeRenewed.RandomForgeRenewed
-api-version: '1.21'
-commands:
-  rfrreload: # 必须与代码中的命令名称完全匹配
-    description: 重载插件配置
-    usage: /rfrreload
-    permission: randomforgerenewed.reload

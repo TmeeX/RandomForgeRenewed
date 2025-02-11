@@ -1,8 +1,9 @@
 package org.Tmeex.randomForgeRenewed;
 
 import com.google.common.collect.ArrayListMultimap;
-import com.google.common.collect.ImmutableMultimap;
-import com.google.common.collect.ImmutableSet;
+import org.bukkit.NamespacedKey;
+import org.bukkit.persistence.PersistentDataContainer;
+import org.bukkit.persistence.PersistentDataType;
 import com.google.common.collect.Multimap;
 import org.bukkit.Material;
 import org.bukkit.attribute.Attribute;
@@ -10,6 +11,7 @@ import org.bukkit.attribute.AttributeModifier;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
+import org.bukkit.event.block.Action;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
@@ -21,70 +23,118 @@ import java.util.concurrent.ThreadLocalRandom;
 public class ForgeListener implements Listener {
     private final RandomForgeRenewed plugin;
 
+    // 固定且合法的UUID和名称（确保全局唯一）
+    private UUID generateUniqueUUID() {
+        return UUID.randomUUID();
+    }
+
     public ForgeListener(RandomForgeRenewed plugin) {
         this.plugin = plugin;
     }
 
     @EventHandler
-    public void onAnvilUse(PlayerInteractEvent event) {
-        if (event.getHand() != EquipmentSlot.HAND) return;
-        if (event.getClickedBlock() == null ||
-                !event.getClickedBlock().getType().name().contains("ANVIL")) return;
+    public void onPlayerInteract(PlayerInteractEvent event) {
+        // 检测Shift+右键空气
+        if (event.getAction() != Action.RIGHT_CLICK_AIR ||
+                !event.getPlayer().isSneaking()) return;
 
         Player player = event.getPlayer();
-        ItemStack item = player.getInventory().getItemInMainHand();
-        if (!isWeapon(item)) return;
+        ItemStack weapon = player.getInventory().getItemInMainHand();
+        if (!isWeapon(weapon)) return;
 
+        // 阻止原版交互
+        event.setCancelled(true);
+
+        // 强化逻辑
         Optional<ConfigManager.ForgingMaterial> material = plugin.getConfigManager().getMaterials().stream()
                 .filter(m -> hasEnoughMaterials(player, m))
                 .findFirst();
 
-        if (!material.isPresent()) return;
+        if (material.isEmpty()) return;
 
-        if (tryForge(player, item, material.get())) {
+        if (tryForge(player, weapon, material.get())) {
             consumeMaterials(player, material.get());
         }
     }
 
     private boolean tryForge(Player player, ItemStack weapon, ConfigManager.ForgingMaterial material) {
-        Random random = ThreadLocalRandom.current();
-        if (random.nextDouble() > material.getChance()) {
-            handleFailure(weapon);
-            player.sendMessage("§c强化失败！");
-            return false;
-        }
+        // 获取现有强化值
+        double currentBonus = getCurrentBonus(weapon);
+        double newBonus = currentBonus +
+                ThreadLocalRandom.current().nextDouble(material.getMinAttack(), material.getMaxAttack());
 
-        addAttackDamage(weapon, material);
-        player.sendMessage("§a强化成功！攻击力增加了！");
+        // 更新属性
+        updateWeaponStats(weapon, newBonus);
+        updateWeaponLore(weapon, newBonus);
+
+        player.sendMessage("§a强化成功！当前总攻击加成: +" + String.format("%.1f", newBonus));
         return true;
     }
 
-    private void addAttackDamage(ItemStack item, ConfigManager.ForgingMaterial material) {
+    private double getCurrentBonus(ItemStack item) {
+        // 使用PersistentDataContainer存储数据
+        ItemMeta meta = item.getItemMeta();
+        PersistentDataContainer pdc = meta.getPersistentDataContainer();
+        NamespacedKey key = new NamespacedKey(plugin, "attack_bonus");
+        return pdc.getOrDefault(key, PersistentDataType.DOUBLE, 0.0);
+    }
+
+    private void updateWeaponStats(ItemStack item, double totalBonus) {
         ItemMeta meta = item.getItemMeta();
         if (meta == null) return;
 
-        // 获取现有属性（可能为null）
+        // 获取并复制可修改的属性集合
         Multimap<Attribute, AttributeModifier> attributes = meta.getAttributeModifiers();
-
-        // 创建新的属性映射（使用Guava的ArrayListMultimap）
-        Multimap<Attribute, AttributeModifier> newAttributes = attributes != null ?
+        Multimap<Attribute, AttributeModifier> mutableAttributes = attributes != null ?
                 ArrayListMultimap.create(attributes) :
                 ArrayListMultimap.create();
 
-        // 创建新修饰符
-        AttributeModifier modifier = new AttributeModifier(
-                UUID.randomUUID(),
+        // 保存原始攻速属性
+        Collection<AttributeModifier> originalSpeed = mutableAttributes.get(Attribute.GENERIC_ATTACK_SPEED);
+
+        // 移除旧攻击属性
+        mutableAttributes.removeAll(Attribute.GENERIC_ATTACK_DAMAGE);
+
+        // 添加新攻击属性
+        UUID attackUUID = UUID.fromString("a1b2c3d4-5e6f-7a8b-9c0d-1e2f3a4b5c6d");
+        AttributeModifier attackModifier = new AttributeModifier(
+                attackUUID,
                 "forge_attack",
-                ThreadLocalRandom.current().nextDouble(material.getMinAttack(), material.getMaxAttack()),
+                totalBonus,
                 AttributeModifier.Operation.ADD_NUMBER,
                 EquipmentSlot.HAND
         );
+        mutableAttributes.put(Attribute.GENERIC_ATTACK_DAMAGE, attackModifier);
 
-        // 添加新属性
-        newAttributes.put(Attribute.GENERIC_ATTACK_DAMAGE, modifier);
+        // 恢复原始攻速属性
+        mutableAttributes.replaceValues(Attribute.GENERIC_ATTACK_SPEED, originalSpeed);
 
         // 设置回ItemMeta
-        meta.setAttributeModifiers(newAttributes);
+        meta.setAttributeModifiers(mutableAttributes);
+
+        // 保存数据
+        PersistentDataContainer pdc = meta.getPersistentDataContainer();
+        pdc.set(new NamespacedKey(plugin, "attack_bonus"),
+                PersistentDataType.DOUBLE,
+                totalBonus);
+
+        item.setItemMeta(meta);
+    }
+
+
+    private void updateWeaponLore(ItemStack item, double bonus) {
+        ItemMeta meta = item.getItemMeta();
+        List<String> lore = meta.hasLore() ? meta.getLore() : new ArrayList<>();
+
+        // 移除旧Lore
+        if (lore != null) {
+            lore.removeIf(line -> line.contains("强化攻击力"));
+        }
+
+        // 添加新Lore
+        lore.add("§6✦ 强化攻击力: +" + String.format("%.1f", bonus));
+        meta.setLore(lore);
+
         item.setItemMeta(meta);
     }
 
@@ -100,7 +150,6 @@ public class ForgeListener implements Listener {
             item.setAmount(0);
         }
     }
-    // 这个类用于失败扣除物品耐久
 
     private boolean isWeapon(ItemStack item) {
         if (item == null) return false;
