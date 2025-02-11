@@ -6,7 +6,7 @@ on:
   pull_request:
 
 env:
-  GRADLE_USER_HOME: /github/home/.gradle
+  GRADLE_USER_HOME: ~/ .gradle
 
 jobs:
   build:
