@@ -1,0 +1,23 @@
+# 强化失败时是否保护武器不消失
+prevent-break: true
+
+# 失败时耐久损失量（当prevent-break为true时有效）
+durability-loss-on-failure: 15
+
+# 强化材料配置
+materials:
+  iron:
+    type: IRON_INGOT
+    amount: 3
+    chance: 0.65
+    attack:
+      min: 2.0
+      max: 4.0
+
+  diamond:
+    type: DIAMOND
+    amount: 1
+    chance: 0.5
+    attack:
+      min: 40.0
+      max: 60.0
