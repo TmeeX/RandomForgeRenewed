@@ -25,7 +25,7 @@ jobs:
       - name: Cache Gradle dependencies
         uses: actions/cache@v2
         with:
-          key: ${{ GITHUB_SHA }}-${{ env.GRADLE_USER_HOME }}
+          key: ${{ GITHUB.SHA }}-${{ env.GRADLE_USER_HOME }}
           path: ${{ env.GRADLE_USER_HOME }}/caches/
       
       - name: Configure Gradle options
