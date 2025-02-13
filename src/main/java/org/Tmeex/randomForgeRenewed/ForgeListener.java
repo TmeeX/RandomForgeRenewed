@@ -62,21 +62,18 @@ public class ForgeListener implements Listener {
             return false;
         }
 
-        // 获取当前加成
+        // 获取当前攻击加成
         double currentAttack = getCurrentBonus(weapon, "attack_bonus");
-        double currentSpeed = getCurrentBonus(weapon, "speed_bonus");
-
-        // 生成新加成
         double newAttack = currentAttack + random.nextDouble(material.getMinAttack(), material.getMaxAttack());
-        double newSpeed = currentSpeed + random.nextDouble(material.getMinSpeed(), material.getMaxSpeed());
 
         // 更新属性和Lore
-        attributeHandler.updateAttributes(weapon, newAttack, newSpeed);
-        updateWeaponLore(weapon, newAttack, newSpeed);
+        attributeHandler.updateAttackAttribute(weapon, newAttack);
+        updateAttackLore(weapon, newAttack);
 
-        player.sendMessage("§a强化成功！");
+        player.sendMessage("§a强化成功！当前攻击加成: +" + String.format("%.1f", newAttack));
         return true;
     }
+
 
 
     private double getCurrentBonus(ItemStack item, String key) {
@@ -86,22 +83,21 @@ public class ForgeListener implements Listener {
                 .getOrDefault(attributeHandler.getKey(key), PersistentDataType.DOUBLE, 0.0);
     }
 
-    private void updateWeaponLore(ItemStack item, double attack, double speed) {
+    private void updateAttackLore(ItemStack item, double attack) {
         ItemMeta meta = item.getItemMeta();
         List<String> lore = new ArrayList<>();
 
-        // 保留原始Lore（过滤系统生成的属性行）
+        // 保留非强化相关Lore
         if (meta.hasLore()) {
             lore.addAll(meta.getLore().stream()
-                    .filter(line -> !line.contains("✦"))
+                    .filter(line -> !line.startsWith("§6✦ 攻击加成"))
                     .toList());
         }
 
-        // 添加新Lore
+        // 更新攻击Lore
         lore.add("§6✦ 攻击加成: +" + String.format("%.1f", attack));
-        lore.add("§6✦ 攻速加成: +" + String.format("%.1f", speed));
-
         meta.setLore(lore);
+
         item.setItemMeta(meta);
     }
 

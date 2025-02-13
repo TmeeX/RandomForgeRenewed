@@ -13,9 +13,6 @@ materials:
     attack:
       min: 1.0
       max: 2.0
-    speed:
-      min: 0.1
-      max: 0.3
 
   diamond:
     type: DIAMOND
@@ -24,6 +21,3 @@ materials:
     attack:
       min: 2.0
       max: 3.5
-    speed:
-      min: 0.2
-      max: 0.4
